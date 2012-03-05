@@ -23,7 +23,6 @@ public:
 
     void fromFile(const char file[]);
 
-    void add(int coordinate, double value);
     void remove(int coordinate);
     void set(int coordinate, double value);
     double get(int coordinate) const;
@@ -37,6 +36,7 @@ public:
     SparceVector operator -(const SparceVector& V1);
     SparceVector operator +(const SparceVector& V1);
     SparceVector operator *(const double x);
+    SparceVector& operator =(const SparceVector& M1);
     double operator *(const SparceVector& V1);
 
     vector<double> V; //values
@@ -55,7 +55,6 @@ public:
 
     void fromFile(const char file[]);
 
-    void add(int row, int col, double value);
     void remove(int row, int col);
     void set(int row, int col, double value);
     double get(int row, int col) const;
@@ -75,10 +74,10 @@ public:
     SparceMatrix operator *(const double x);
     SparceMatrix operator *(const SparceMatrix& M1);
     SparceVector operator *(const SparceVector& V1);
-//    SparceMatrix& operator =(const SparceMatrix& M1);
+    SparceMatrix& operator =(const SparceMatrix& M1);
     friend ostream& operator <<(ostream& os, SparceMatrix& M);
 
-    SparceVector* R; // rows
+    vector<SparceVector> R; // rows
     int D; //dimension
 };
 
@@ -86,7 +85,8 @@ struct LUP {
 
     SparceMatrix L;
     SparceMatrix U;
-    SparceMatrix P;
+    SparceMatrix Pc;
+    SparceMatrix Pr;
 };
 
 #endif // SPARCE_H
