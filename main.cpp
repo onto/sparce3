@@ -3,13 +3,22 @@
 
 using namespace std;
 
-Coordinates exactOptimizedGeneralElement(SparceMatrix& A, int k, double pivTol) {
+const unsigned int MAX_EXACT  = 1;
+const unsigned int MAX_MULT   = 2;
+const unsigned int MAX_SUM    = 3;
+const unsigned int NORM_EXACT = 4;
+const unsigned int NORM_MULT  = 5;
+const unsigned int NORM_SUM   = 6;
+
+
+Coordinates exactOptimizedGeneralElement(SparceMatrix& A, int k, double pivTol, bool byNorm) {
 
     Coordinates C;
     C.col = C.row = -1;
 
     int D = A.dimension(), q, j;
     const int n = D - k;
+    double norm = 0, t;
 
     int B[n][n], B1[n][n], G[n][n];
 
@@ -24,18 +33,21 @@ Coordinates exactOptimizedGeneralElement(SparceMatrix& A, int k, double pivTol) 
         }
     }
 
-    double norm = 0;
+
 
     for (int i = k; i < D; ++i) {
 
         q = A.R[i].F;
-        while (true) {
-            if (q == -1)
-                break;
+        while (q != -1) {
             j = A.R[i].C[q];
             if (j >= k) {
                 B[i - k][j - k] = 1;
-                T[i - k] += abs(A.R[i].V[q]);
+                t = abs(A.R[i].V[q]);
+                if (byNorm) {
+                    T[i - k] += t;
+                } else {
+                    if (t > norm) norm = t;
+                }
             }
             q = A.R[i].N[q];
         }
@@ -78,13 +90,14 @@ Coordinates exactOptimizedGeneralElement(SparceMatrix& A, int k, double pivTol) 
     return C;
 }
 
-Coordinates optimizedGeneralElement(SparceMatrix& A, int k, double pivTol) {
+Coordinates optimizedGeneralElement(SparceMatrix& A, int k, double pivTol, bool byNorm, bool bySum) {
 
     Coordinates C;
     C.col = C.row = -1;
 
     int D = A.dimension();
     const int n = D - k;
+    double norm = 0, t;
 
     int I[n], J[n];
     double T[n];
@@ -100,26 +113,31 @@ Coordinates optimizedGeneralElement(SparceMatrix& A, int k, double pivTol) {
     for (int i = k; i < D; ++i) {
 
         q = A.R[i].F;
-        while (true) {
-            if (q == -1)
-                break;
+        while (q != -1) {
             j = A.R[i].C[q];
             if (j >= k) {
                 I[i - k] += 1;
                 J[j - k] += 1;
-                T[i - k] += abs(A.R[i].V[q]);
+                t = abs(A.R[i].V[q]);
+                if (byNorm) {
+                    T[i - k] += t;
+                } else {
+                    if (t > norm) norm = t;
+                }
             }
             q = A.R[i].N[q];
         }
+        if ((byNorm) && (T[i - k] > norm))
+            norm = T[i - k];
     }
 
-    double norm = 0;
-
-    for (int i = 0; i < n; ++i) {
-        if (T[i] > norm)
-            norm = T[i];
-        if ((I[i] == 0) || (J[i] == 0))
-            return C;
+    if (byNorm) {
+        for (int i = 0; i < n; ++i) {
+            if (T[i] > norm)
+                norm = T[i];
+            if ((I[i] == 0) || (J[i] == 0))
+                return C;
+        }
     }
 
     int minc = D * D, newc;
@@ -132,7 +150,7 @@ Coordinates optimizedGeneralElement(SparceMatrix& A, int k, double pivTol) {
             j = A.R[i].C[q];
             if (j >= k) {
                 v = abs(A.R[i].V[q]);
-                newc = (I[i - k] - 1) * (J[j - k] - 1);
+                newc = bySum ? (I[i-k]+J[j-k]-1) :(I[i - k] - 1) * (J[j - k] - 1);
                 if ((v >= norm * pivTol) && ((newc < minc) || ((newc == minc) && (value < v)))) {
                     C.row = i;
                     C.col = j;
@@ -147,76 +165,35 @@ Coordinates optimizedGeneralElement(SparceMatrix& A, int k, double pivTol) {
     return C;
 }
 
-//SparceVector solveByGauss(SparceMatrix A, SparceVector B, double PivTol, bool exact) {
+Coordinates getOptimizedElement(SparceMatrix& A, int i, double pivTol, int genElem) {
 
-//    int N = A.dimension();
-//    double t, t1, t2, t3;
-//    SparceVector X(N);
-//    int P[N], k;
+    switch (genElem) {
+    case NORM_EXACT:
+        return exactOptimizedGeneralElement(A,i,pivTol,1);
+        break;
+    case NORM_MULT:
+        return optimizedGeneralElement(A,i,pivTol,1,0);
+        break;
+    case NORM_SUM:
+        return optimizedGeneralElement(A,i,pivTol,1,1);
+        break;
+    case MAX_EXACT:
+        return exactOptimizedGeneralElement(A,i,pivTol,0);
+        break;
+    case MAX_MULT:
+        return optimizedGeneralElement(A,i,pivTol,0,0);
+        break;
+    case MAX_SUM:
+        return optimizedGeneralElement(A,i,pivTol,0,1);
+        break;
+    }
+    return exactOptimizedGeneralElement(A,i,pivTol,1);
+}
 
-//    for (int i = 0; i < N; ++i)
-//        P[i] = i;
-
-//    for (int i = 0; i < N - 1; ++i) {
-
-//        Coordinates g = exact ? exactOptimizedGeneralElement(A, i, PivTol) : optimizedGeneralElement(A, i, PivTol);
-
-//        if (g.col == -1)
-//            throw "Can't solve by Gauss";
-
-//        A.swapColRow(i, g.row, i, g.col);
-//        B.swap(i, g.row);
-//        if (i != g.col) {
-//            k = P[i];
-//            P[i] = P[g.col];
-//            P[g.col] = k;
-//        }
-
-//        t = A.get(i, i);
-
-//        for (int k = i + 1; k < N; ++k) {
-//            t3 = A.get(k, i);
-//            if (t3 == 0)
-//                continue;
-//            for (int j = i + 1; j < N; ++j) {
-//                t2 = A.get(i, j);
-//                if (t2 == 0)
-//                    continue;
-//                t1 = A.get(k, j);
-//                A.set(k, j, t1 - t2 * t3 / t);
-//            }
-//            A.remove(k, i);
-//            t2 = B.get(i);
-//            if (t2 == 0)
-//                continue;
-//            t1 = B.get(k);
-//            B.set(k, t1 - t2 * t3 / t);
-//        }
-//    }
-
-//    for (int i = N - 1; i >= 0; --i) {
-//        t3 = B.get(i);
-//        if (t3 == 0)
-//            continue;
-//        t = A.get(i, i);
-//        for (int j = i - 1; j >= 0; --j) {
-//            t1 = A.get(j, i);
-//            if (t1 == 0)
-//                continue;
-//            t2 = B.get(j);
-//            B.set(j, t2 - t1 * t3 / t);
-//            A.remove(j, i);
-//        }
-//        X.set(P[i], t3 / t);
-//    }
-
-//    return X;
-//}
-
-LUP LU(SparceMatrix A, double pivTol, bool exact) {
+LUP LU(SparceMatrix A, double pivTol, int genElem) {
 
     int D = A.dimension();
-    double t,t1,t2, t3;
+    double t,t3;
     LUP T;
     T.L = SparceMatrix(D);
     T.Pr = SparceMatrix(D);
@@ -229,7 +206,7 @@ LUP LU(SparceMatrix A, double pivTol, bool exact) {
 
     for (int i = 0; i < D; ++i) {
 
-        Coordinates g = exact ? exactOptimizedGeneralElement(A, i, pivTol) : optimizedGeneralElement(A, i, pivTol);
+        Coordinates g = getOptimizedElement(A,i,pivTol,genElem);
 
         if (g.col == -1)
             throw "Can't LU correctly";
@@ -261,46 +238,42 @@ int main() {
     SparceMatrix M, M1;
 //    SparceVector V;
     M.fromFile("matrix.txt");
-    cout << M.cellsNum() << endl;
+//    cout << M.cellsNum() << endl;
 
 //    V.fromFile("vector.txt");
 
-    for (double i = 1; i >= 1e-10; i *= 0.1) {
+//    for (double i = 1; i >= 1e-6; i *= 0.1) {
 
+//        try {
+//            time_t t = clock();
+//            LUP T = LU(M, i, MAX_EXACT);
+//            t = clock() - t;
+//            T.Pr = T.Pr.transpose();
+//            T.Pc = T.Pc.transpose();
+//            M1 = T.Pr * T.L * T.U * T.Pc - M;
+//            cout << "Norm,Exact \t" << "PivTol: " << i << "\t Error: " << M1.normM() << "\t cells: " << T.L.cellsNum() + T.U.cellsNum() << "\t time: " << double(t)/CLOCKS_PER_SEC << endl;
+
+//        } catch (const char s[]) {
+//            cout << "Norm,Exact \t" << "PivTol: " << i << "\t Error: " << s << endl;
+//        }
+
+//        cout << endl;
+
+//    }
+
+    double pivTol = 0.01;
+
+    ofstream out("output.txt",ios_base::app);
+    for (int i = 1; i <= 6; i++) {
         try {
-
-            time_t t = clock();
-            LUP T = LU(M, i, 0);
-            t = clock() - t;
-            T.Pr = T.Pr.transpose();
-            T.Pc = T.Pc.transpose();
-            M1 = T.Pr * T.L * T.U * T.Pc - M;
-//            cout << T.L <<  endl << T.U << endl << T.Pr << endl << T.Pc << endl;
-//            cout << M1 << endl;
-//            M1 = M1 - M;
-//            cout << M1 << endl;
-            cout << "PivTol: " << i << "\t Error: " << M1.normM() << "\t cells: " << T.L.cellsNum() + T.U.cellsNum() << "\t time: " << double(t)/CLOCKS_PER_SEC <<endl;
-
+            LUP T = LU(M, pivTol, i);
+            out << T.L.cellsNum() + T.U.cellsNum() - T.L.D << " ";
         } catch (const char s[]) {
-            cout << "PivTol: " << i << "\t Error: " << s << endl;
+            out << 0 << " ";
         }
-
-        try {
-            time_t t = clock();
-            LUP T = LU(M, i, 1);
-            t = clock() - t;
-            T.Pr = T.Pr.transpose();
-            T.Pc = T.Pc.transpose();
-            M1 = T.Pr * T.L * T.U * T.Pc - M;
-            cout << "PivTol: " << i << "\t Error: " << M1.normM() << "\t cells: " << T.L.cellsNum() + T.U.cellsNum() << "\t time: " << double(t)/CLOCKS_PER_SEC << endl;
-
-        } catch (const char s[]) {
-            cout << "PivTol: " << i << "\t Error: " << s << endl;
-        }
-
-        cout << endl;
-
     }
+    out << endl;
+
 
     return 0;
 }
