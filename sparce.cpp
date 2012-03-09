@@ -334,7 +334,7 @@ double SparceVector::get(int coordinate) const {
     return 0;
 }
 
-void SparceVector::remove(int coordinate) { //TODO: make faster?
+void SparceVector::remove(int coordinate) {
 
     int q = F;
     int last = -1;
@@ -365,6 +365,7 @@ void SparceVector::swap(int c1, int c2) { // TODO: make faster
     if (c1 == c2) return;
 
     double t1 = get(c1), t2 = get(c2);
+    if ((t1 == 0) && (t2 == 0)) return;
 
     set(c2, t1);
     set(c1, t2);
@@ -392,32 +393,88 @@ double SparceVector::normInf() {
     return max;
 }
 
-ostream& operator <<(ostream& os, SparceVector& V1) { // TODO: make faster
+ostream& operator <<(ostream& os, SparceVector& V1) {
 
-    int D = V1.dimension();
+    int q = V1.F;
+    int last = -1;
 
-    for (int i = 0; i < D; ++i) {
-        os << V1.get(i) << "\t";
+    while (q != -1) {
+
+        for (int i = last+1; i < V1.C[q]; ++i)
+            os << 0 << "\t";
+        os << V1.V[q] << "\t";
+
+        last = V1.C[q];
+        q = V1.N[q];
     }
+    for (int i = last+1; i < V1.D; ++i)
+        os << 0 << "\t";
+
     return os;
 }
 
 SparceVector SparceVector::operator +(const SparceVector& V1) { // TODO: make faster
 
-    SparceVector VV = *this;
+    SparceVector VV(D);
 
-    for (int i = 0; i < V1.cellsNum(); ++i)
-        VV.set(V1.C[i], VV.get(V1.C[i]) + V1.V[i]);
+    int q = F;
+    int q1 = V1.F;
+
+    while (q != -1) {
+
+        while ((q1 != -1) && (V1.C[q1] < C[q])) {
+
+            VV.set(V1.C[q1],V1.V[q1]);
+            q1 = V1.N[q1];
+        }
+
+        if ((q1!= -1) && (V1.C[q1] == C[q])) {
+            VV.set(C[q],V[q] + V1.V[q1]);
+            q1 = V1.N[q1];
+        } else
+            VV.set(C[q],V[q]);
+
+        q = N[q];
+    }
+
+    while (q1 != -1) {
+
+        VV.set(V1.C[q1],V1.V[q1]);
+        q1 = V1.N[q1];
+    }
 
     return VV;
 }
 
 SparceVector SparceVector::operator -(const SparceVector& V1) { // TODO: make faster
 
-    SparceVector VV = *this;
+    SparceVector VV(D);
 
-    for (int i = 0; i < V1.cellsNum(); ++i)
-        VV.set(V1.C[i], VV.get(V1.C[i]) - V1.V[i]);
+    int q = F;
+    int q1 = V1.F;
+
+    while (q != -1) {
+
+        while ((q1 != -1) && (V1.C[q1] < C[q])) {
+
+            VV.set(V1.C[q1],-V1.V[q1]);
+            q1 = V1.N[q1];
+        }
+
+        if ((q1!= -1) && (V1.C[q1] == C[q])) {
+            VV.set(C[q],V[q] - V1.V[q1]);
+            q1 = V1.N[q1];
+        } else
+            VV.set(C[q],V[q]);
+
+        q = N[q];
+    }
+
+    while (q1 != -1) {
+
+        VV.set(V1.C[q1],-V1.V[q1]);
+        q1 = V1.N[q1];
+    }
 
     return VV;
 }
