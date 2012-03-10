@@ -26,6 +26,7 @@ public:
     void remove(int coordinate);
     void set(int coordinate, double value);
     double get(int coordinate) const;
+    void add(int coordinate, double value);
     void swap(int c1, int c2);
 
     int dimension();
@@ -58,16 +59,16 @@ public:
     void remove(int row, int col);
     void set(int row, int col, double value);
     double get(int row, int col) const;
+    void add(int row,int col, double value);
 
     int dimension();
     int cellsNum() const;
-//    double normL();
     double normM();
 
     void swapCol(int c1, int c2);
     void swapRow(int r1, int r2);
     void swapColRow(int r1, int r2, int c1, int c2);
-    SparceMatrix transpose();
+    SparceMatrix transpose() const;
 
     SparceMatrix operator +(const SparceMatrix& M1);
     SparceMatrix operator -(const SparceMatrix& M1);

@@ -45,35 +45,18 @@ void SparceMatrix::fromFile(const char file[]) {
     in >> D;
     R.resize(D);
 
-    int q, x;
+    int x;
 
     for (int row = 0; row < D; ++row) {
-        R[row].V.clear();
-        R[row].C.clear();
-        R[row].N.clear();
-        R[row].F = -1;
-        R[row].D = D;
 
-        q = 0;
-        bool first = true;
+        R[row] = SparceVector(D);
+
         for (int i = 0; i < D; ++i) {
             in >> x;
             if (x != 0) {
-                if (first) {
-                    R[row].F = q;
-                    first = false;
-                } else {
-                    R[row].N.push_back(q);
-                }
-
-                R[row].C.push_back(i);
-                R[row].V.push_back(x);
-
-                q++;
+                R[row].add(i,x);
             }
         }
-        if (!first)
-            R[row].N.push_back(-1);
     }
     in.close();
 }
@@ -91,6 +74,11 @@ double SparceMatrix::get(int row, int col) const {
 void SparceMatrix::remove(int row, int col) {
 
     R[row].remove(col);
+}
+
+void SparceMatrix::add(int row, int col, double value) {
+
+    R[row].add(col,value);
 }
 
 void SparceMatrix::swapCol(int c1, int c2) {
@@ -116,13 +104,20 @@ void SparceMatrix::swapColRow(int r1, int r2, int c1, int c2) {
     swapRow(r1, r2);
 }
 
-SparceMatrix SparceMatrix::transpose() { // TODO: make faster
+SparceMatrix SparceMatrix::transpose() const {
 
     SparceMatrix M(D);
 
-    for (int i = 0; i < D; ++i)
-        for (int j = 0; j < D; ++j)
-            M.set(j, i, get(i, j));
+    int q;
+
+    for (int i = 0; i < D; ++i) {
+
+        q = R[i].F;
+        while (q != -1) {
+            M.add(R[i].C[q],i,R[i].V[q]);
+            q = R[i].N[q];
+        }
+    }
 
     return M;
 }
@@ -142,18 +137,12 @@ double SparceMatrix::normM() {
     return norm;
 }
 
-//double SparceMatrix::normL() {
-
-//}
-
 ostream& operator <<(ostream& os, SparceMatrix& M1) {
 
     int D = M1.dimension();
 
     for (int i = 0; i < D; ++i) {
-        for (int j = 0; j < D; ++j)
-            os << M1.get(i,j) << "\t";
-        os << endl;
+        os << M1.R[i];
     }
     return os;
 }
@@ -163,8 +152,7 @@ SparceMatrix SparceMatrix::operator +(const SparceMatrix& M1) {
     SparceMatrix M(D);
 
     for (int i = 0; i < D; ++i)
-        for (int j = 0; j < D; ++j)
-            M.R[i] = R[i] + M1.R[i];
+        M.R[i] = R[i] + M1.R[i];
 
     return M;
 }
@@ -174,8 +162,7 @@ SparceMatrix SparceMatrix::operator -(const SparceMatrix& M1) {
     SparceMatrix M(D);
 
     for (int i = 0; i < D; ++i)
-        for (int j = 0; j < D; ++j)
-            M.R[i] = R[i] - M1.R[i];
+        M.R[i] = R[i] - M1.R[i];
 
     return M;
 }
@@ -191,18 +178,14 @@ SparceMatrix SparceMatrix::operator *(const double x) {
     return M;
 }
 
-SparceMatrix SparceMatrix::operator *(const SparceMatrix& M1) { // TODO: make faster
+SparceMatrix SparceMatrix::operator *(const SparceMatrix& M1) {
 
     SparceMatrix M(D);
-    double S;
+    SparceMatrix T = M1.transpose();
 
     for (int i = 0; i < D; ++i)
         for (int j = 0; j < D; ++j) {
-            S = 0;
-            for (int k = 0; k < D; ++k) {
-                S += get(i, k) * M1.get(k, j);
-            }
-            M.set(i, j, S);
+            M.add(i, j, R[i]*T.R[j]);
         }
 
     return M;
@@ -213,7 +196,7 @@ SparceVector SparceMatrix::operator *(const SparceVector& V1) {
     SparceVector VV(D);
 
     for (int i = 0; i < D; ++i) {
-        VV.set(i,R[i]*V1);
+        VV.add(i,R[i]*V1);
     }
 
     return VV;
@@ -261,33 +244,16 @@ void SparceVector::fromFile(const char file[]) {
 
     double x;
 
-    V.clear();
-    C.clear();
-    N.clear();
-    F = -1;
-
     in >> D;
 
-    int q = 0;
-    bool first = true;
+    *this = SparceVector(D);
+
     for (int i = 0; i < D; ++i) {
         in >> x;
         if (x != 0) {
-            if (first) {
-                F = q;
-                first = false;
-            } else {
-                N.push_back(q);
-            }
-
-            C.push_back(i);
-            V.push_back(x);
-
-            q++;
+            add(i,x);
         }
     }
-    if (!first)
-        N.push_back(-1);
     in.close();
 }
 
@@ -301,14 +267,15 @@ void SparceVector::set(int coordinate, double value) {
     int i = q;
     bool first = true;
 
-    while ((q != -1) && (C[q] <= coordinate)) {
-        if (C[q] == coordinate) { //if not, then add
-            V[q] = value;
-            return;
-        }
+    while ((q != -1) && (C[q] < coordinate)) {
         i = q;
         q = N[q];
         first = false;
+    }
+
+    if ((q != -1) && (C[q] == coordinate)) { //if exists
+        V[q] = value;
+        return;
     }
 
     V.push_back(value);
@@ -325,13 +292,27 @@ double SparceVector::get(int coordinate) const {
 
     int q = F;
 
-    while ((q != -1) && (C[q] <= coordinate)) {
-        if (C[q] == coordinate)
-            return V[q];
+    while ((q != -1) && (C[q] < coordinate))
         q = N[q];
-    }
+
+    if ((q != -1) && (C[q] == coordinate))
+        return V[q];
 
     return 0;
+}
+
+void SparceVector::add(int coordinate, double value) {
+
+    if (abs(value) <= eps) return;
+
+    int q = N.size();
+    C.push_back(coordinate);
+    V.push_back(value);
+    N.push_back(-1);
+    if (q == 0)
+        F = 0;
+    else
+        N[q-1] = q;
 }
 
 void SparceVector::remove(int coordinate) {
@@ -339,24 +320,25 @@ void SparceVector::remove(int coordinate) {
     int q = F;
     int last = -1;
 
-    while ((q != -1) && (C[q] <= coordinate)) {
-        if (C[q] == coordinate) {
-            if (last == -1)
-                F = N[q];
-            else
-                N[last] = N[q];
-            C.erase(C.begin() + q);
-            N.erase(N.begin() + q);
-            V.erase(V.begin() + q);
-            for (unsigned int i = 0; i < N.size(); ++i)
-                if (N[i] >= q)
-                    N[i] -= 1;
-            if (F >= q)
-                F -= 1;
-            return;
-        }
+    while ((q != -1) && (C[q] < coordinate)) {
         last = q;
         q = N[q];
+    }
+
+    if ((q != -1) && (C[q] == coordinate)) {
+        if (last == -1)
+            F = N[q];
+        else
+            N[last] = N[q];
+        C.erase(C.begin() + q);
+        N.erase(N.begin() + q);
+        V.erase(V.begin() + q);
+        for (unsigned int i = 0; i < N.size(); ++i)
+            if (N[i] >= q)
+                N[i] -= 1;
+        if (F >= q)
+            F -= 1;
+        return;
     }
 }
 
@@ -413,7 +395,7 @@ ostream& operator <<(ostream& os, SparceVector& V1) {
     return os;
 }
 
-SparceVector SparceVector::operator +(const SparceVector& V1) { // TODO: make faster
+SparceVector SparceVector::operator +(const SparceVector& V1) {
 
     SparceVector VV(D);
 
@@ -423,30 +405,28 @@ SparceVector SparceVector::operator +(const SparceVector& V1) { // TODO: make fa
     while (q != -1) {
 
         while ((q1 != -1) && (V1.C[q1] < C[q])) {
-
-            VV.set(V1.C[q1],V1.V[q1]);
+            VV.add(V1.C[q1],V1.V[q1]);
             q1 = V1.N[q1];
         }
 
         if ((q1!= -1) && (V1.C[q1] == C[q])) {
-            VV.set(C[q],V[q] + V1.V[q1]);
+            VV.add(C[q],V[q] + V1.V[q1]);
             q1 = V1.N[q1];
         } else
-            VV.set(C[q],V[q]);
+            VV.add(C[q],V[q]);
 
         q = N[q];
     }
 
     while (q1 != -1) {
-
-        VV.set(V1.C[q1],V1.V[q1]);
+        VV.add(V1.C[q1],V1.V[q1]);
         q1 = V1.N[q1];
     }
 
     return VV;
 }
 
-SparceVector SparceVector::operator -(const SparceVector& V1) { // TODO: make faster
+SparceVector SparceVector::operator -(const SparceVector& V1) {
 
     SparceVector VV(D);
 
@@ -456,23 +436,21 @@ SparceVector SparceVector::operator -(const SparceVector& V1) { // TODO: make fa
     while (q != -1) {
 
         while ((q1 != -1) && (V1.C[q1] < C[q])) {
-
-            VV.set(V1.C[q1],-V1.V[q1]);
+            VV.add(V1.C[q1],-V1.V[q1]);
             q1 = V1.N[q1];
         }
 
         if ((q1!= -1) && (V1.C[q1] == C[q])) {
-            VV.set(C[q],V[q] - V1.V[q1]);
+            VV.add(C[q],V[q] - V1.V[q1]);
             q1 = V1.N[q1];
         } else
-            VV.set(C[q],V[q]);
+            VV.add(C[q],V[q]);
 
         q = N[q];
     }
 
     while (q1 != -1) {
-
-        VV.set(V1.C[q1],-V1.V[q1]);
+        VV.add(V1.C[q1],-V1.V[q1]);
         q1 = V1.N[q1];
     }
 
@@ -489,11 +467,23 @@ SparceVector SparceVector::operator *(const double x) {
     return VV;
 }
 
-double SparceVector::operator *(const SparceVector& V1) { //TODO: make faster
+double SparceVector::operator *(const SparceVector& V1) {
 
+    int q = F;
+    int q1 = V1.F;
     double sum = 0;
-    for (int i = 0; i < D; ++i)
-        sum += get(i)*V1.get(i);
+
+    while (q != -1) {
+
+        while ((q1 != -1) && (V1.C[q1] < C[q]))
+            q1 = V1.N[q1];
+
+        if ((q1 != -1) && (V1.C[q1] == C[q]))
+            sum += V1.V[q1]*V[q];
+
+        q = N[q];
+    }
+
     return sum;
 }
 
