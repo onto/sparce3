@@ -1,4 +1,5 @@
 #include "sparce.h"
+#include <omp.h>
 
 double eps = 0.0;
 
@@ -85,6 +86,7 @@ void SparceMatrix::swapCol(int c1, int c2) {
 
     if (c1 == c2) return;
 
+#pragma omp parallel for
     for (int i = 0; i < D; ++i)
         R[i].swap(c1,c2);
 }
@@ -151,6 +153,7 @@ SparceMatrix SparceMatrix::operator +(const SparceMatrix& M1) {
 
     SparceMatrix M(D);
 
+#pragma omp parallel for
     for (int i = 0; i < D; ++i)
         M.R[i] = R[i] + M1.R[i];
 
@@ -161,6 +164,7 @@ SparceMatrix SparceMatrix::operator -(const SparceMatrix& M1) {
 
     SparceMatrix M(D);
 
+#pragma omp parallel for
     for (int i = 0; i < D; ++i)
         M.R[i] = R[i] - M1.R[i];
 
@@ -171,6 +175,7 @@ SparceMatrix SparceMatrix::operator *(const double x) {
 
     SparceMatrix M(*this);
 
+#pragma omp parallel for
     for (int i = 0; i < D; ++i)
         for (int j = 0; j < M.R[i].cellsNum(); ++j)
             M.R[i].V[j] *= x;
@@ -183,6 +188,7 @@ SparceMatrix SparceMatrix::operator *(const SparceMatrix& M1) {
     SparceMatrix M(D);
     SparceMatrix T = M1.transpose();
 
+#pragma omp parallel for
     for (int i = 0; i < D; ++i)
         for (int j = 0; j < D; ++j) {
             M.add(i, j, R[i]*T.R[j]);
@@ -263,6 +269,7 @@ void SparceVector::set(int coordinate, double value) {
         remove(coordinate);
         return;
     }
+
     int q = F;
     int i = q;
     bool first = true;
@@ -338,7 +345,6 @@ void SparceVector::remove(int coordinate) {
                 N[i] -= 1;
         if (F >= q)
             F -= 1;
-        return;
     }
 }
 
@@ -461,6 +467,7 @@ SparceVector SparceVector::operator *(const double x) {
 
     SparceVector VV = *this;
 
+#pragma omp parallel for
     for (int i = 0; i < cellsNum(); ++i)
         VV.V[i] *= x;
 
