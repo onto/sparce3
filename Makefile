@@ -1,5 +1,5 @@
 CXX=g++
-CFLAGS=-c -Wall -Wextra -fopenmp -I. -O3
+CFLAGS=-c -Wall -Wextra -I. -fopenmp -O3
 LDFLAGS=-fopenmp
 SOURCES1=main.cpp sparce.cpp
 SOURCES2=generator.cpp

@@ -144,7 +144,7 @@ ostream& operator <<(ostream& os, SparceMatrix& M1) {
     int D = M1.dimension();
 
     for (int i = 0; i < D; ++i) {
-        os << M1.R[i];
+        os << M1.R[i] << endl;
     }
     return os;
 }
@@ -206,6 +206,38 @@ SparceVector SparceMatrix::operator *(const SparceVector& V1) {
     }
 
     return VV;
+}
+
+SparceMatrix SparceMatrix::operator *(const PermutationMatrix& M1) {
+
+    SparceMatrix M(D);
+
+    int q;
+#pragma omp parallel for private(q)
+    for (int i = 0; i < D; ++i) {
+
+        q = R[i].F;
+        while (q != -1) {
+            M.set(i,M1.M[R[i].C[q]],R[i].V[q]);
+            q = R[i].N[q];
+        }
+    }
+
+    return M;
+}
+
+
+SparceMatrix operator *(const PermutationMatrix& M1, const SparceMatrix& M2) {
+
+    int D = M2.D;
+
+    SparceMatrix M(D);
+
+    for (int i = 0; i < D; i++) {
+        M.R[i] = M2.R[M1.M[i]];
+    }
+
+    return M;
 }
 
 SparceMatrix& SparceMatrix::operator =(const SparceMatrix& M1) {
@@ -503,5 +535,81 @@ SparceVector& SparceVector::operator =(const SparceVector& M1) {
     D = M1.D;
 
     return *this;
+}
+
+
+PermutationMatrix::PermutationMatrix() {
+
+    D = 0;
+}
+
+PermutationMatrix::PermutationMatrix(int dimension) {
+
+    D = dimension;
+
+    for (int i = 0; i < D; i++)
+        M.push_back(i);
+}
+
+void PermutationMatrix::swapCol(int c1, int c2) {
+
+    if (c1 == c2) return;
+
+    int t;
+    t = M[c1];
+    M[c1] = M[c2];
+    M[c2] = t;
+}
+
+void PermutationMatrix::swapRow(int r1, int r2) {
+
+    if (r1 == r2) return;
+
+    int c1 = 0, c2 = 0;
+
+    for (int i = 0; i < D; i++)
+        if (M[i] == r1)
+            c1 = i;
+        else if (M[i] == r2)
+            c2 = i;
+
+    swapCol(c1, c2);
+}
+
+PermutationMatrix PermutationMatrix::transpose() {
+
+    PermutationMatrix M1;
+
+    M1.D = D;
+    M1.M.resize(D);
+
+    for (int i = 0; i < D; i++)
+        M1.M[M[i]] = i;
+
+    return M1;
+}
+
+PermutationMatrix& PermutationMatrix::operator =(const PermutationMatrix& M1) {
+    D = M1.D;
+    M = M1.M;
+
+    return *this;
+}
+
+ostream& operator <<(ostream& os, PermutationMatrix& M1) {
+
+    int D = M1.D;
+
+    for (int i = 0; i < D; i++) {
+        for (int j = 0; j < D; j++) {
+            if (M1.M[j] == i)
+                os << "1 ";
+            else
+                os << "0 ";
+        }
+        os << endl;
+    }
+
+    return os;
 }
 

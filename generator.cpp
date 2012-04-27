@@ -25,8 +25,8 @@ int main(int argc, char *argv[3]) {
 
     srand(time(&theTime));
 
-    //int t = 0;
     int k = int(N/(G-1));
+    if (k == 0) k = 1;
     int c;
 
     for (int i = 1; i <= N; ++i) {

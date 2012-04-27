@@ -14,6 +14,8 @@ const unsigned int NORM_SUM   = 5;
 const unsigned int NORM_MULT  = 6;
 const unsigned int NORM_MULT2 = 7;
 
+const unsigned int NUM_THREADS = 1;
+
 Coordinates exactOptimizedGeneralElement(SparceMatrix& A, int k, double pivTol,
                                          bool byNorm) {
 
@@ -172,7 +174,7 @@ Coordinates optimizedGeneralElement(SparceMatrix& A, int k, double pivTol,
     Coordinates C1;
     C1.col = C1.row = -1;
 
-#pragma omp parallel for private(q,j,v,newc) firstprivate(minc1,value1)
+#pragma omp parallel for private(q,j,v,newc) firstprivate(minc1,value1,C1)
     for (int i = k; i < D; ++i) {
 
         q = A.R[i].F;
@@ -251,14 +253,8 @@ LUP LU(SparceMatrix A, double pivTol, int genElem) {
     double t,t1;
     LUP T;
     T.L = SparceMatrix(D);
-    T.Pr = SparceMatrix(D);
-    T.Pc = SparceMatrix(D);
-
-#pragma omp parallel for
-    for (int i = 0; i < D; ++i) {
-        T.Pr.add(i, i, 1);
-        T.Pc.add(i, i, 1);
-    }
+    T.Pr = PermutationMatrix(D);
+    T.Pc = PermutationMatrix(D);
 
     for (int i = 0; i < D; ++i) {
 
@@ -267,7 +263,7 @@ LUP LU(SparceMatrix A, double pivTol, int genElem) {
         //pivTol determines limit of value of general element
 
         if (g.col == -1)
-            throw "Can't LU correctly";
+            throw "Can not LU correctly";
 
         A.swapColRow(i, g.row, i, g.col);
         T.L.swapRow(i, g.row);
@@ -294,7 +290,9 @@ LUP LU(SparceMatrix A, double pivTol, int genElem) {
 
 int main(int argc, char *argv[]) {
 
-    omp_set_num_threads(1);
+#ifdef _OPENMP
+    omp_set_num_threads(NUM_THREADS);
+#endif
 
     SparceMatrix M, M1;
 //    SparceVector V, V1, V2;
@@ -307,8 +305,8 @@ int main(int argc, char *argv[]) {
 //            time_t t = clock();
 //            LUP T = LU(M, i, MAX_MULT);
 //            t = clock() - t;
-//            T.Pr = T.Pr.transpose();
-//            T.Pc = T.Pc.transpose();
+//            //T.Pr = T.Pr.transpose();
+//            //T.Pc = T.Pc.transpose();
 //            M1 = T.Pr * T.L * T.U * T.Pc - M;
 //            cout << "Norm,Exact \t" << "PivTol: " << i << "\t Error: " << M1.normM() << "\t cells: " << T.L.cellsNum() + T.U.cellsNum() << "\t time: " << double(t)/CLOCKS_PER_SEC << endl;
 
@@ -319,8 +317,8 @@ int main(int argc, char *argv[]) {
 //            time_t t = clock();
 //            LUP T = LU(M, i, MAX_EXACT);
 //            t = clock() - t;
-//            T.Pr = T.Pr.transpose();
-//            T.Pc = T.Pc.transpose();
+//            //T.Pr = T.Pr.transpose();
+//            //T.Pc = T.Pc.transpose();
 //            M1 = T.Pr * T.L * T.U * T.Pc - M;
 //            cout << "Norm,Exact \t" << "PivTol: " << i << "\t Error: " << M1.normM() << "\t cells: " << T.L.cellsNum() + T.U.cellsNum() << "\t time: " << double(t)/CLOCKS_PER_SEC << endl;
 
@@ -332,43 +330,42 @@ int main(int argc, char *argv[]) {
 
 //    }
 
-    double pivTol = atof(argv[1]);
-    ofstream out("output.txt",ios_base::app);
-    ofstream tout("toutput.txt",ios_base::app);
-    out << M.cellsNum() << " ";
-    for (int i = 0; i < 8; i++) {
-        if ((i == 0) || (i == 4)) {
-            out << "0 ";
-            tout << "-1 ";
-            continue;
-        }
-        try {
-            time_t t = clock();
-            LUP T = LU(M, pivTol, i);
-            tout << double(clock() - t)/CLOCKS_PER_SEC << " ";
-            out << T.L.cellsNum() + T.U.cellsNum() - T.L.D << " ";
-        } catch (const char s[]) {
-            out << "0 ";
-            tout << "-1 ";
-        }
-    }
-    out << endl;
-    tout << endl;
-
-
-//    double i = 0.01;
-//    try {
-//        time_t t = clock();
-//        LUP T = LU(M, i, MAX_MULT2);
-//        t = clock() - t;
-////        T.Pr = T.Pr.transpose();
-////        T.Pc = T.Pc.transpose();
-////        M1 = T.Pr * T.L * T.U * T.Pc - M;
-//        cout << "Norm,Exact \t" << "PivTol: " << i << "\t Error: " << M1.normM() << "\t cells: " << T.L.cellsNum() + T.U.cellsNum() << "\t time: " << double(t)/CLOCKS_PER_SEC << endl;
-
-//    } catch (const char s[]) {
-//        cout << "Norm,Exact \t" << "PivTol: " << i << "\t Error: " << s << endl;
+//    double pivTol = atof(argv[1]);
+//    ofstream out("output.txt",ios_base::app);
+//    ofstream tout("toutput.txt",ios_base::app);
+//    out << M.cellsNum() << " ";
+//    for (int i = 0; i < 8; i++) {
+//        if ((i == 0) || (i == 4)) {
+//            out << "0 ";
+//            tout << "-1 ";
+//            continue;
+//        }
+//        try {
+//            time_t t = clock();
+//            LUP T = LU(M, pivTol, i);
+//            tout << double(clock() - t)/CLOCKS_PER_SEC << " ";
+//            out << T.L.cellsNum() + T.U.cellsNum() - T.L.D << " ";
+//        } catch (const char s[]) {
+//            out << "0 ";
+//            tout << "-1 ";
+//        }
 //    }
+//    out << endl;
+//    tout << endl;
+
+    double i = 0.01;
+    try {
+        time_t t = clock();
+        LUP T = LU(M, i, MAX_MULT2);
+        t = clock() - t;
+        //T.Pr = T.Pr.transpose();
+        //T.Pc = T.Pc.transpose();
+        M1 = T.Pr * T.L * T.U * T.Pc - M;
+        cout << "Norm,Exact \t" << "PivTol: " << i << "\t Error: " << M1.normM() << "\t cells: " << T.L.cellsNum() + T.U.cellsNum() << "\t time: " << double(t)/CLOCKS_PER_SEC << endl;
+
+    } catch (const char s[]) {
+        cout << "Norm,Exact \t" << "PivTol: " << i << "\t Error: " << s << endl;
+    }
 
     return 0;
 }
