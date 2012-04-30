@@ -121,15 +121,6 @@ Coordinates optimizedGeneralElement(SparceMatrix& A, int k, double pivTol,
     int D = A.dimension();
     const int n = D - k;
 
-//    int *I = new int[n];
-//    int *J = new int[n];
-
-//#pragma omp parallel for
-//    for (int i = 0; i < n; ++i) {
-//        I[i] = 0;
-//        J[i] = 0;
-//    }
-
     vector<int> I(n,0), J(n,0);
 
     int q, j;
@@ -204,9 +195,6 @@ Coordinates optimizedGeneralElement(SparceMatrix& A, int k, double pivTol,
         }
         }
     }
-
-//    delete [] I;
-//    delete [] J;
 
     return C;
 }
