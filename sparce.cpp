@@ -46,7 +46,7 @@ void SparceMatrix::fromFile(const char file[]) {
     in >> D;
     R.resize(D);
 
-    int x;
+    double x;
 
     for (int row = 0; row < D; ++row) {
 
@@ -88,7 +88,7 @@ void SparceMatrix::swapCol(int c1, int c2) {
 
 #pragma omp parallel for
     for (int i = 0; i < D; ++i)
-        R[i].swap(c1,c2);
+        R[i].swap(c1, c2);
 }
 
 void SparceMatrix::swapRow(int r1, int r2) {

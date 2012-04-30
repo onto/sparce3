@@ -121,45 +121,43 @@ Coordinates optimizedGeneralElement(SparceMatrix& A, int k, double pivTol,
     int D = A.dimension();
     const int n = D - k;
 
-    int *I = new int[n];
-    int *J = new int[n];
-    double *T = new double[n];
+//    int *I = new int[n];
+//    int *J = new int[n];
 
-#pragma omp parallel for
-    for (int i = 0; i < n; ++i) {
-        I[i] = 0;
-        J[i] = 0;
-        T[i] = 0;
-    }
+//#pragma omp parallel for
+//    for (int i = 0; i < n; ++i) {
+//        I[i] = 0;
+//        J[i] = 0;
+//    }
+
+    vector<int> I(n,0), J(n,0);
 
     int q, j;
-    double norm = 0, norm1 = 0, v;
+    double norm = 0, v, S;
 
-#pragma omp parallel for private(q,j,v) firstprivate(norm1)
+#pragma omp parallel for private(q,j,v,S)
     for (int i = k; i < D; ++i) {
-
+        S = 0;
         q = A.R[i].F;
         while (q != -1) {
             j = A.R[i].C[q];
             if (j >= k) {
-                I[i-k] += 1;
+                I[i-k]++;
 #pragma omp atomic
-                J[j-k] += 1;
+                J[j-k]++;
                 v = abs(A.R[i].V[q]);
                 if (byNorm)
-                    T[i-k] += v;
-                else if (v > norm1)
-                    norm1 = v;
+                    S += v;
+                else if (v > S)
+                    S = v;
             }
             q = A.R[i].N[q];
         }
 
 #pragma omp critical
         {
-        if ((byNorm) && (T[i-k] > norm))
-            norm = T[i-k];
-        else if (norm1 > norm)
-            norm = norm1;
+        if (S > norm)
+            norm = S;
         }
     }
 
@@ -198,19 +196,17 @@ Coordinates optimizedGeneralElement(SparceMatrix& A, int k, double pivTol,
 
 #pragma omp critical
         {
-            if ((value1 != 0) && ((minc1 < minc) || ((minc1 == minc) && (value < value1)))) {
+        if ((minc1 < minc) || ((minc1 == minc) && (value < value1))) {
             C.row = C1.row;
             C.col = C1.col;
             value = value1;
             minc = minc1;
         }
         }
-
     }
 
-    delete [] I;
-    delete [] J;
-    delete [] T;
+//    delete [] I;
+//    delete [] J;
 
     return C;
 }
@@ -353,18 +349,30 @@ int main(int argc, char *argv[]) {
 //    out << endl;
 //    tout << endl;
 
-    double i = 0.01;
+//    double i = 0.01;
+//    try {
+//        time_t t = clock();
+//        LUP T = LU(M, i, MAX_MULT2);
+//        t = clock() - t;
+//        //T.Pr = T.Pr.transpose();
+//        //T.Pc = T.Pc.transpose();
+//        M1 = T.Pr * T.L * T.U * T.Pc - M;
+//        cout << "Norm,Exact \t" << "PivTol: " << i << "\t Error: " << M1.normM() << "\t cells: " << T.L.cellsNum() + T.U.cellsNum() << "\t time: " << double(t)/CLOCKS_PER_SEC << endl;
+
+//    } catch (const char s[]) {
+//        cout << "Norm,Exact \t" << "PivTol: " << i << "\t Error: " << s << endl;
+//    }
+
+    //double pivTol = atof(argv[1]);
+    double pivTol = 0.01;
     try {
         time_t t = clock();
-        LUP T = LU(M, i, MAX_MULT2);
+        LUP T = LU(M, pivTol, MAX_MULT2);
         t = clock() - t;
-        //T.Pr = T.Pr.transpose();
-        //T.Pc = T.Pc.transpose();
-        M1 = T.Pr * T.L * T.U * T.Pc - M;
-        cout << "Norm,Exact \t" << "PivTol: " << i << "\t Error: " << M1.normM() << "\t cells: " << T.L.cellsNum() + T.U.cellsNum() << "\t time: " << double(t)/CLOCKS_PER_SEC << endl;
+        cout << "Norm,Exact \t" << "PivTol: " << pivTol << "\t Error: " << M1.normM() << "\t cells: " << T.L.cellsNum() + T.U.cellsNum() << "\t time: " << double(t)/CLOCKS_PER_SEC << endl;
 
     } catch (const char s[]) {
-        cout << "Norm,Exact \t" << "PivTol: " << i << "\t Error: " << s << endl;
+        cout << "Error: " << s << endl;
     }
 
     return 0;
