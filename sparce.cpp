@@ -47,15 +47,21 @@ void SparceMatrix::fromFile(const char file[]) {
     R.resize(D);
 
     double x;
+    int c;
 
-    for (int row = 0; row < D; ++row) {
+    for (int i = 0; i < D; ++i) {
 
-        R[row] = SparceVector(D);
+        R[i] = SparceVector(D);
 
-        for (int i = 0; i < D; ++i) {
-            in >> x;
-            if (x != 0) {
-                R[row].add(i,x);
+        while (true) {
+
+            in >> c;
+
+            if (c != -1) {
+                in >> x;
+                R[i].add(c,x);
+            } else {
+                break;
             }
         }
     }

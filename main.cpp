@@ -14,71 +14,62 @@ const unsigned int NORM_SUM   = 5;
 const unsigned int NORM_MULT  = 6;
 const unsigned int NORM_MULT2 = 7;
 
-const unsigned int NUM_THREADS = 1;
+const unsigned int NUM_THREADS = 2;
 
 Coordinates exactOptimizedGeneralElement(SparceMatrix& A, int k, double pivTol,
                                          bool byNorm) {
 
-    Coordinates C;
-    C.col = C.row = -1;
-
-    int D = A.dimension(), q, j;
+    int D = A.dimension();
     const int n = D - k;
-    double norm = 0, t;
 
-    int **B = new int *[n];
-    int **B1 = new int *[n];
-    int **G = new int *[n];
-    for (int i = 0; i < n; ++i) {
-        B[i] = new int[n];
-        B1[i] = new int[n];
-        G[i] = new int[n];
-    }
+    vector<vector<int> > B(n, vector<int> (n,0)),  B1(n, vector<int> (n,0)),
+            G(n, vector<int> (n,0));
 
-    double *T = new double[n];
+    unsigned int newc, minc = D * D, minc1 = D * D;
+    int q, j;
+    double v, S, norm = 0, value = 0, value1 = 0;
 
-    for (int i = 0; i < n; ++i) {
-        T[i] = 0;
-        for (int j = 0; j < n; ++j) {
-            B[i][j] = 0;
-            B1[i][j] = 0;
-            G[i][j] = 0;
-        }
-    }
+    Coordinates C, C1;
+    C.col = C.row = C1.col = C1.row = -1;
 
+#pragma omp parallel for private(q,j,v,S)
     for (int i = k; i < D; ++i) {
 
+        S = 0;
         q = A.R[i].F;
         while (q != -1) {
             j = A.R[i].C[q];
             if (j >= k) {
-                B[i - k][j - k] = 1;
-                t = abs(A.R[i].V[q]);
-                if (byNorm) {
-                    T[i - k] += t;
-                } else {
-                    if (t > norm) norm = t;
-                }
+                B[i-k][j-k] = 1;
+                v = abs(A.R[i].V[q]);
+                if (byNorm)
+                    S += v;
+                else if (v > S)
+                    S = v;
             }
             q = A.R[i].N[q];
         }
-        if (T[i - k] > norm)
-            norm = T[i - k];
+
+#pragma omp critical
+        {
+        if (S > norm)
+            norm = S;
+        }
     }
 
+#pragma omp parallel for
     for (int i = 0; i < n; ++i)
         for (int j = 0; j < n; ++j)
             for (int k = 0; k < n; ++k)
                 B1[i][j] += B[i][k] * (1 - B[j][k]); //B'[k][j] = 1 - B[j][k]
 
+#pragma omp parallel for
     for (int i = 0; i < n; ++i)
         for (int k = 0; k < n; ++k)
             for (int j = 0; j < n; ++j)
                 G[i][j] += B1[i][k] * B[k][j];
 
-    int minc = D * D, newc;
-    double value = 0, v;
-
+#pragma omp parallel for private(q,j,v,newc) firstprivate(minc1,value1,C1)
     for (int i = k; i < D; ++i) {
 
         q = A.R[i].F;
@@ -86,28 +77,28 @@ Coordinates exactOptimizedGeneralElement(SparceMatrix& A, int k, double pivTol,
             j = A.R[i].C[q];
             if (j >= k) {
                 v = abs(A.R[i].V[q]);
-                newc = G[i - k][j - k];
+                newc = G[i-k][j-k];
                 if ((v >= norm * pivTol) &&
-                        ((newc < minc) || ((newc == minc) && (value < v)))) {
-                    C.row = i;
-                    C.col = j;
-                    value = v;
-                    minc = newc;
+                        ((newc < minc1) || ((newc == minc1) && (value1 < v)))) {
+                    C1.row = i;
+                    C1.col = j;
+                    value1 = v;
+                    minc1 = newc;
                 }
             }
             q = A.R[i].N[q];
         }
-    }
 
-    for (int i = 0; i < n; ++i) {
-        delete [] B[i];
-        delete [] B1[i];
-        delete [] G[i];
+#pragma omp critical
+        {
+        if ((minc1 < minc) || ((minc1 == minc) && (value < value1))) {
+            C.row = C1.row;
+            C.col = C1.col;
+            value = value1;
+            minc = minc1;
+        }
+        }
     }
-    delete [] B;
-    delete [] B1;
-    delete [] G;
-    delete [] T;
 
     return C;
 }
@@ -115,19 +106,21 @@ Coordinates exactOptimizedGeneralElement(SparceMatrix& A, int k, double pivTol,
 Coordinates optimizedGeneralElement(SparceMatrix& A, int k, double pivTol,
                                     bool byNorm, bool bySum, bool byMult2) {
 
-    Coordinates C;
-    C.col = C.row = -1;
-
     int D = A.dimension();
     const int n = D - k;
 
     vector<int> I(n,0), J(n,0);
 
+    unsigned int newc, minc = D * D, minc1 = D * D;
     int q, j;
-    double norm = 0, v, S;
+    double v, S, norm = 0, value = 0, value1 = 0;
+
+    Coordinates C, C1;
+    C.col = C.row = C1.col = C1.row = -1;
 
 #pragma omp parallel for private(q,j,v,S)
     for (int i = k; i < D; ++i) {
+
         S = 0;
         q = A.R[i].F;
         while (q != -1) {
@@ -156,12 +149,6 @@ Coordinates optimizedGeneralElement(SparceMatrix& A, int k, double pivTol,
         if ((I[i] == 0) || (J[i] == 0))
             return C;
     }
-
-    int minc = D * D, minc1 = D * D, newc;
-    double value = 0, value1 = 0;
-
-    Coordinates C1;
-    C1.col = C1.row = -1;
 
 #pragma omp parallel for private(q,j,v,newc) firstprivate(minc1,value1,C1)
     for (int i = k; i < D; ++i) {
@@ -352,16 +339,18 @@ int main(int argc, char *argv[]) {
 //    }
 
     //double pivTol = atof(argv[1]);
-    double pivTol = 0.01;
-    try {
-        time_t t = clock();
-        LUP T = LU(M, pivTol, MAX_MULT2);
-        t = clock() - t;
-        cout << "Norm,Exact \t" << "PivTol: " << pivTol << "\t Error: " << M1.normM() << "\t cells: " << T.L.cellsNum() + T.U.cellsNum() << "\t time: " << double(t)/CLOCKS_PER_SEC << endl;
+//    double pivTol = 0.01;
+//    try {
+//        time_t t = clock();
+//        LUP T = LU(M, pivTol, MAX_MULT2);
+//        t = clock() - t;
+//        cout << "Norm,Exact \t" << "PivTol: " << pivTol << "\t Error: " << M1.normM() << "\t cells: " << T.L.cellsNum() + T.U.cellsNum() << "\t time: " << double(t)/CLOCKS_PER_SEC << endl;
 
-    } catch (const char s[]) {
-        cout << "Error: " << s << endl;
-    }
+//    } catch (const char s[]) {
+//        cout << "Error: " << s << endl;
+//    }
+
+    cout << M << endl;
 
     return 0;
 }
