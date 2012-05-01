@@ -59,8 +59,6 @@ int main(int argc, char *argv[4]) {
     M.close();
     V.close();
 
-    //cout << t;
-
     return 0;
 }
 
