@@ -73,6 +73,7 @@ public:
     SparceMatrix(const SparceMatrix& M1);
 
     void fromFile(const char file[]);
+    void toFile(const char file[]);
 
     void remove(int row, int col);
     void set(int row, int col, double value);

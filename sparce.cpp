@@ -68,6 +68,29 @@ void SparceMatrix::fromFile(const char file[]) {
     in.close();
 }
 
+void SparceMatrix::toFile(const char file[]) {
+
+    ofstream out(file);
+
+    out << D << endl;
+
+    int q;
+
+    for (int i = 0; i < D; i++) {
+
+        q = R[i].F;
+        while (q != -1) {
+
+            out << R[i].C[q] << " " << R[i].V[q] << "\t";
+            q = R[i].N[q];
+        }
+
+        out << -1 << endl;
+    }
+
+    out.close();
+}
+
 void SparceMatrix::set(int row, int col, double value) {
 
     R[row].set(col,value);
