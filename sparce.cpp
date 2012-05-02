@@ -331,14 +331,11 @@ void SparceVector::set(int coordinate, double value) {
         return;
     }
 
-    int q = F;
-    int i = q;
-    bool first = true;
+    int q = F, p = -1;
 
     while ((q != -1) && (C[q] < coordinate)) {
-        i = q;
+        p = q;
         q = N[q];
-        first = false;
     }
 
     if ((q != -1) && (C[q] == coordinate)) { //if exists
@@ -346,14 +343,15 @@ void SparceVector::set(int coordinate, double value) {
         return;
     }
 
+    //add
+    int s = N.size();
     V.push_back(value);
     C.push_back(coordinate);
-    if (first) {
-        F = V.size() - 1;
-    } else {
-        N[i] = V.size() - 1;
-    }
     N.push_back(q);
+    if (p == -1)
+        F = s;
+    else
+        N[p] = s;
 }
 
 double SparceVector::get(int coordinate) const {
@@ -385,19 +383,18 @@ void SparceVector::add(int coordinate, double value) {
 
 void SparceVector::remove(int coordinate) {
 
-    int q = F;
-    int last = -1;
+    int q = F, p = -1;
 
     while ((q != -1) && (C[q] < coordinate)) {
-        last = q;
+        p = q;
         q = N[q];
     }
 
     if ((q != -1) && (C[q] == coordinate)) {
-        if (last == -1)
+        if (p == -1)
             F = N[q];
         else
-            N[last] = N[q];
+            N[p] = N[q];
         C.erase(C.begin() + q);
         N.erase(N.begin() + q);
         V.erase(V.begin() + q);
@@ -409,7 +406,7 @@ void SparceVector::remove(int coordinate) {
     }
 }
 
-void SparceVector::swap(int c1, int c2) { // TODO: make faster
+void SparceVector::swap(int c1, int c2) {
 
     if (c1 == c2) return;
 
@@ -445,18 +442,18 @@ double SparceVector::normInf() {
 ostream& operator <<(ostream& os, SparceVector& V1) {
 
     int q = V1.F;
-    int last = -1;
+    int p = -1;
 
     while (q != -1) {
 
-        for (int i = last+1; i < V1.C[q]; ++i)
+        for (int i = p+1; i < V1.C[q]; ++i)
             os << 0 << "\t";
         os << V1.V[q] << "\t";
 
-        last = V1.C[q];
+        p = V1.C[q];
         q = V1.N[q];
     }
-    for (int i = last+1; i < V1.D; ++i)
+    for (int i = p+1; i < V1.D; ++i)
         os << 0 << "\t";
 
     return os;
