@@ -1,5 +1,5 @@
 CXX=g++
-CFLAGS=-c -Wall -Wextra -I. -fopenmp -O3
+CFLAGS=-c -Wall -Wextra -I. -fopenmp -O3 -g
 LDFLAGS=-fopenmp
 SOURCES1=main.cpp sparce.cpp
 SOURCES2=generator.cpp
@@ -20,4 +20,4 @@ $(EXECUTABLE2): $(OBJECTS2)
 	$(CXX) $(CFLAGS) $< -o $@
 
 clean:
-	rm *.o $(EXECUTABLE1) $(EXECUTABLE2)
+	rm -f *.o $(EXECUTABLE1) $(EXECUTABLE2)
